@@ -67,7 +67,7 @@ The default password is "raspberry". In order to change it, run this in your
 camp directory:
 
 ```
-python -c "import hashlib; import getpass; print(hashlib.sha512(getpass.getpass())).hexdigest()" > password.txt
+python -c "import hashlib; import getpass; print(hashlib.sha512(getpass.getpass().encode('utf-8')).hexdigest())" > password.txt
 ```
 
 This will prompt you for a password, encrypt it, and save the result in
