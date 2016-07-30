@@ -9,11 +9,7 @@ import os
 import time
 import threading
 import webbrowser
-
-try:
-    import cStringIO as io
-except ImportError:
-    import io
+import io
 
 import tornado.web
 import tornado.websocket
@@ -66,17 +62,20 @@ class WebSocket(tornado.websocket.WebSocketHandler):
 
     def loop(self):
         """Sends camera images in an infinite loop."""
-        sio = io.StringIO()
+        bio = io.BytesIO()
 
         if args.use_usb:
             _, frame = camera.read()
             img = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-            img.save(sio, "JPEG")
+            img.save(bio, "JPEG")
         else:
-            camera.capture(sio, "jpeg", use_video_port=True)
+            camera.resolution = (640, 480)
+            camera.hflip = True
+            camera.vflip = True
+            camera.capture(bio, "jpeg", use_video_port=True)
 
         try:
-            self.write_message(base64.b64encode(sio.getvalue()))
+            self.write_message(base64.b64encode(bio.getvalue()))
         except tornado.websocket.WebSocketClosedError:
             self.camera_loop.stop()
 
@@ -119,6 +118,6 @@ handlers = [(r"/", IndexHandler), (r"/login", LoginHandler),
 application = tornado.web.Application(handlers, cookie_secret=PASSWORD)
 application.listen(args.port)
 
-webbrowser.open("http://localhost:%d/" % args.port, new=2)
+#webbrowser.open("http://localhost:%d/" % args.port, new=2)
 
 tornado.ioloop.IOLoop.instance().start()
