@@ -31,6 +31,10 @@ class IndexHandler(tornado.web.RequestHandler):
         else:
             self.render("index.html", port=args.port)
 
+class LogoutHandler(tornado.web.RequestHandler):
+    def get(self):
+        self.clear_cookie(COOKIE_NAME)
+        self.redirect(self.get_argument("next", "/"))
 
 class LoginHandler(tornado.web.RequestHandler):
 
@@ -125,6 +129,7 @@ if __name__ == "__main__":
 
     handlers = [(r"/", IndexHandler),
                 (r"/login", LoginHandler),
+                (r"/logout", LogoutHandler),
                 (r"/websocket", WebSocket),
                 (r"/.well-known/acme-challenge/(.*)", 
                     tornado.web.StaticFileHandler, 
