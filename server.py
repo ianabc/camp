@@ -113,18 +113,25 @@ if args.resolution in resolutions:
 else:
     raise Exception("%s not in resolution options." % args.resolution)
 
-settings = {
-        "static_path": os.path.join(os.path.dirname(__file__), ".well-known/acme-challenge")
-}
 
-handlers = [(r"/", IndexHandler), (r"/login", LoginHandler),
+if __name__ == "__main__":
+
+    settings = {
+        "static_path": os.path.join(os.path.dirname(__file__), ".well-known/acme-challenge")
+    }
+
+    handlers = [(r"/", IndexHandler), (r"/login", LoginHandler),
             (r"/websocket", WebSocket),
             (r"/.well-known/acme-challenge/(.*)", tornado.web.StaticFileHandler, 
                 dict(path=settings['static_path'])),
             (r'/static/(.*)', tornado.web.StaticFileHandler, {'path': ROOT})]
-application = tornado.web.Application(handlers, cookie_secret=PASSWORD)
-application.listen(args.port)
 
-#webbrowser.open("http://localhost:%d/" % args.port, new=2)
 
-tornado.ioloop.IOLoop.instance().start()
+    application = tornado.web.Application(handlers, cookie_secret=PASSWORD)
+    http_server = tornado.httpserver.HTTPServer(application, ssl_options={
+        "certfile": "/home/pi/.getssl/fyodor.no-ip.org/cert.pem",
+        "keyfile": "/home/pi/.getssl/fyodor.no-ip.org/fyodor.no-ip.org.key"
+        }
+    )
+    http_server.listen(args.port)
+    tornado.ioloop.IOLoop.instance().start()
