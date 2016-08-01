@@ -12,6 +12,7 @@ import webbrowser
 import io
 
 import tornado.web
+import tornado.httpserver
 import tornado.websocket
 from tornado.ioloop import PeriodicCallback
 
@@ -45,7 +46,6 @@ class LoginHandler(tornado.web.RequestHandler):
             time.sleep(1)
             self.redirect(u"/login?error")
 
-
 class WebSocket(tornado.websocket.WebSocketHandler):
 
     def on_message(self, message):
@@ -69,9 +69,6 @@ class WebSocket(tornado.websocket.WebSocketHandler):
             img = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
             img.save(bio, "JPEG")
         else:
-            camera.resolution = (640, 480)
-            camera.hflip = True
-            camera.vflip = True
             camera.capture(bio, "jpeg", use_video_port=True)
 
         try:
@@ -82,7 +79,7 @@ class WebSocket(tornado.websocket.WebSocketHandler):
 
 parser = argparse.ArgumentParser(description="Starts a webserver that "
                                  "connects to a webcam.")
-parser.add_argument("--port", type=int, default=8000, help="The "
+parser.add_argument("--port", type=int, default=8080, help="The "
                     "port on which to serve the website.")
 parser.add_argument("--resolution", type=str, default="low", help="The "
                     "video resolution. Can be high, medium, or low.")
@@ -99,7 +96,11 @@ if args.use_usb:
 else:
     import picamera
     camera = picamera.PiCamera()
-    camera.start_preview()
+    camera.hflip = False
+    camera.vflip = False
+    camera.zoom = ( 0.2, 0.0, 1.0, 1.0)
+    camera.led = False
+    #camera.start_preview()
 
 resolutions = {"high": (1280, 720), "medium": (640, 480), "low": (320, 240)}
 if args.resolution in resolutions:
@@ -112,8 +113,14 @@ if args.resolution in resolutions:
 else:
     raise Exception("%s not in resolution options." % args.resolution)
 
+settings = {
+        "static_path": os.path.join(os.path.dirname(__file__), ".well-known/acme-challenge")
+}
+
 handlers = [(r"/", IndexHandler), (r"/login", LoginHandler),
             (r"/websocket", WebSocket),
+            (r"/.well-known/acme-challenge/(.*)", tornado.web.StaticFileHandler, 
+                dict(path=settings['static_path'])),
             (r'/static/(.*)', tornado.web.StaticFileHandler, {'path': ROOT})]
 application = tornado.web.Application(handlers, cookie_secret=PASSWORD)
 application.listen(args.port)

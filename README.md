@@ -96,3 +96,36 @@ server to do something.
 If you want to add in extra camera features, opencv comes with a lot of useful
 computer vision algorithms. Check out its functionality before writing your
 own.
+
+#### SSL
+It is pretty simple to add SSL to stop your password from being transmitted to
+the application in the plain. This isn't perfect, but it's an improvement. A
+simple way to do this is to use the [getssl](https://github.com/srvrco/getssl)
+shell script to perform the registration and renewal steps for letsencrypt
+certificates. In addition to the script, we need to ensure that the application
+can serve up the response to the ACME challenge.
+
+First of all, generate the configuration
+```
+$ cd getssl
+$ ./getssl -c <your domain name here>
+```
+This writes files to `~/.getssl/` including a certificate config. The only thing
+you should need to change is the ACME response location.
+```
+$ vi ~/.getssl/<your domain name here>/getssl.cfg
+...
+ACL=('/home/pi/Projects/hummingbirds2/.well-known/acme-challenge')
+...
+```
+Make sure that your application is publicly routable on ports 80 and 443. Then
+run the script
+```
+$ cd getssl
+$ ./getssl <your domain name here>
+```
+The script should write a response into
+.well-known/acme-challenge/SOMEWEIRDFILE, it'll go and grab the signed
+certificate and intermediate certs and write them into ~/.getssl/<your domain
+name here>.
+
