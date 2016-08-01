@@ -48,6 +48,9 @@ class LoginHandler(tornado.web.RequestHandler):
 
 class WebSocket(tornado.websocket.WebSocketHandler):
 
+    def check_origin(self, origin):
+        return True
+
     def on_message(self, message):
         """Evaluates the function pointed to by json-rpc."""
 
@@ -120,18 +123,16 @@ if __name__ == "__main__":
         "static_path": os.path.join(os.path.dirname(__file__), ".well-known/acme-challenge")
     }
 
-    handlers = [(r"/", IndexHandler), (r"/login", LoginHandler),
-            (r"/websocket", WebSocket),
-            (r"/.well-known/acme-challenge/(.*)", tornado.web.StaticFileHandler, 
-                dict(path=settings['static_path'])),
-            (r'/static/(.*)', tornado.web.StaticFileHandler, {'path': ROOT})]
+    handlers = [(r"/", IndexHandler),
+                (r"/login", LoginHandler),
+                (r"/websocket", WebSocket),
+                (r"/.well-known/acme-challenge/(.*)", 
+                    tornado.web.StaticFileHandler, 
+                    dict(path=settings['static_path'])),
+                (r'/static/(.*)', tornado.web.StaticFileHandler, {'path': ROOT})]
 
-
+    print("Listening on port: {}".format(args.port))
     application = tornado.web.Application(handlers, cookie_secret=PASSWORD)
-    http_server = tornado.httpserver.HTTPServer(application, ssl_options={
-        "certfile": "/home/pi/.getssl/fyodor.no-ip.org/cert.pem",
-        "keyfile": "/home/pi/.getssl/fyodor.no-ip.org/fyodor.no-ip.org.key"
-        }
-    )
+    http_server = tornado.httpserver.HTTPServer(application)
     http_server.listen(args.port)
     tornado.ioloop.IOLoop.instance().start()
