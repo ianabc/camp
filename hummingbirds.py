@@ -103,9 +103,9 @@ if args.use_usb:
 else:
     import picamera
     camera = picamera.PiCamera()
-    camera.hflip = False
-    camera.vflip = False
-    camera.zoom = ( 0.2, 0.0, 1.0, 1.0)
+    camera.hflip = True
+    camera.vflip = True
+    camera.zoom = ( 0.0, 0.0, 1.0, 1.0)
     camera.led = False
     #camera.start_preview()
 
