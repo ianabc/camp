@@ -269,4 +269,11 @@ At this point, visiting http://birds.example.com should redirect you to
 https://birds.example.com and then on to the login page. You should enter the
 password you defined above then enjoy the view!
 
-
+A final touch is to turn off the camera LED, I'm not sure how hummingbirds feel
+about RED LEDs.
+```
+$ sudo vi /boot/config.txt
+...
+disable_camera_led=1
+$ sudo reboot
+```
