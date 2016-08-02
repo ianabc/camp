@@ -47,14 +47,14 @@ run the server.
 
 ```
 git clone https://github.com/patrickfuller/camp.git
-python camp/server.py
+python camp/hummingbirds.py
 ```
 
 Navigate to http://your.r.pi.ip:8080 and check out your webcam.
 
 ####USB Camera
 
-Use with `python server.py --use-usb`.
+Use with `python hummingbirds.py --use-usb`.
 
 ####Password
 
@@ -82,7 +82,7 @@ occasional stranger out, but won't stand up to targeted hacking.
 The website consists of `index.html`, `login.html`, and `style.css`. These can be
 edited to change the look of camp.
 
-If you want to add in extra functionality, edit `client.js` and `server.py`.
+If you want to add in extra functionality, edit `client.js` and `hummingbirds.py`.
 The client should send a request to the server, which will then cause the
 server to do something.
 
@@ -175,11 +175,11 @@ that it is listening on port 80 that is accessible to inbound internet
 connections (this might involve setting up port forwarding on your router).
 ```
 $ workon hummingbirds
-$ python server.py --port 80
+$ python hummingbirds.py --port 80
 ```
 
 You should now be able to run the getssl script and have your response served up
-via server.py. Make sure the config file in
+via hummingbirds.py. Make sure the config file in
 `~/.getssl/birds.example.com/getssl.cfg` is correct (particularly the ACL
 value).
 ```
