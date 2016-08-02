@@ -1,4 +1,4 @@
-#!/home/pi/.venvs/hummingbirds2/bin/python
+#!/home/pi/.virtualenvs/hummingbirds/bin/python
 """
 Creates an HTTP server with basic auth and websocket communication.
 """

@@ -50,7 +50,7 @@ git clone https://github.com/patrickfuller/camp.git
 python camp/server.py
 ```
 
-Navigate to http://your.r.pi.ip:8000 and check out your webcam.
+Navigate to http://your.r.pi.ip:8080 and check out your webcam.
 
 ####USB Camera
 
@@ -76,13 +76,6 @@ This will prompt you for a password, encrypt it, and save the result in
 Note that this level of password protection is basic - it's fine for keeping the
 occasional stranger out, but won't stand up to targeted hacking.
 
-####Run on startup
-
-It's nice to have your pi start camp whenever it turns on. Let's make that
-happen. Type `sudo nano /etc/rc.local` to open this file for editing, and add
-the line `nohup python /home/pi/camp/server.py &` before the last line. Note
-that you may need to change the path (`/home/pi/camp/server.py`) to point to
-the right file.
 
 ####Customization
 
@@ -97,35 +90,183 @@ If you want to add in extra camera features, opencv comes with a lot of useful
 computer vision algorithms. Check out its functionality before writing your
 own.
 
-#### SSL
-It is pretty simple to add SSL to stop your password from being transmitted to
-the application in the plain. This isn't perfect, but it's an improvement. A
-simple way to do this is to use the [getssl](https://github.com/srvrco/getssl)
-shell script to perform the registration and renewal steps for letsencrypt
-certificates. In addition to the script, we need to ensure that the application
-can serve up the response to the ACME challenge.
+### Example Setup
 
-First of all, generate the configuration
+**N.B. This is JUST an example, not in any way a best practice setup!**
+
+This setup will use nginx to provide an SSL reverse proxy to the webcam service.
+This will allow us to avoid the password being sent in clear text. It will also
+cover setting up the program as a (systemd) service. 
+
+You could just connect your pi to a public IP, but if (like me) you're behind a
+domestic router, you will need to set up port forwarding for ports 80 and 443 so
+that incoming traffic on those ports lands on nginx. Along the way, we will be
+using letsencrypt to get valid certificates which also requires public access to
+these ports.
+
+Our starting point is raspbian-lite (2016-05), we assume that you've already
+configured a network connection (e.g. put a working config in
+wpa_supplicant.conf and told raspi-config to wait for network on boot).
+
+#### VirtualEnvs
+On top of the lite distribution we'll add virtualenv to keep our python
+dependencies isolated.
 ```
+$ apt-get install virtualenv virtualenv-wrapper git build-essential python3-dev
+$ vi ~/.bash_profile
+  ...
+ +WORKON_HOME=$HOME/.virtualenvs
+ +PROJECT_HOME=$HOME/Projects
+
+$ mkdir $HOME/Projects
+```
+Log out then back in again to pick up all of the virtualenv tools, then clone
+out this repository
+```
+$ mkproject -p /usr/bin/python3.4 hummingbirds
+```
+
+You should now be inside a working environment ready to install the project. To
+do that, just clone this repository to that location
+```
+$ git clone https://github.com/ianabc/camp.git .
+```
+
+#### GetSSL and Letsencrupt
+The [getssl](https://github.com/srvrco/getssl) project uses a bash script to
+interact with the [letsencrypt](https://letsencrypt.org) project. We'll use it
+to provide a valid certificate and key pair for nginx. We will use
+birds.example.com as an example domain.
+```
+$ cd $HOME
+$ apt-get install dnsutils
+$ git clone https://github.com/srvrco/getssl
 $ cd getssl
-$ ./getssl -c <your domain name here>
+$ ./getssl -c birds.example.com
 ```
-This writes files to `~/.getssl/` including a certificate config. The only thing
-you should need to change is the ACME response location.
+This will write config files for getssl (global) and the domain
+birds.example.com under $HOME/.getssl. The global configuration is fine for our
+needs, but we need to tweak the domain configuration options. The default
+configuration uses the letsencrypt staging servers to allow you to debug the
+process, these servers don't have the same restrictions and rate limits as the
+production service. We'll assume you've done that (do it!) and everything is
+ready for real certificates. 
 ```
-$ vi ~/.getssl/<your domain name here>/getssl.cfg
+$ cd .getssl/birds.example.com/
+$ vi getssl.cfg
+ ...
+-#CA=https://acme-v01.api.letsencrypt.org
++CA=https://acme-v01.api.letsencrypt.org
+ ...
+-SANS=www.birs.example.com
++#SANS=www.birs.example.com
+ ...
++ACL=/home/pi/Projects/hummingbirds/.well-known/acme-challenge
+ ...
+-#DOMAIN_CHAIN_LOCATION=""
++DOMAIN_CHAIN_LOCATION="/home/pi/.getssl/birds.example.com/birds.example.com_chain.crt"
+ ...
+```
+
+During the certificate issuing process the script will write a file under the
+$ACL location and the letsencrypt service will request it. We need a process to
+serve that request, but we can do it with the camp application. Just make sure
+that it is listening on port 80 that is accessible to inbound internet
+connections (this might involve setting up port forwarding on your router).
+```
+$ workon hummingbirds
+$ python server.py --port 80
+```
+
+You should now be able to run the getssl script and have your response served up
+via server.py. Make sure the config file in
+`~/.getssl/birds.example.com/getssl.cfg` is correct (particularly the ACL
+value).
+```
+$ cd $HOME/getssl
+$ ./getssl birds.example.com
+```
+You should end up with keys and certificates under `.getssl/birds.example.com`
+including one with the filename `birds.example.com_chain.crt`. This file is the
+certificate along with the correct chain information to allow browsers to
+validate your side.
+
+
+#### nginx
+Now install nginx and create a configuration to act as a reverse proxy for the
+site and websocket.
+```
+$ apt-get install nginx
+$ cd /etc/nginx/sites-enabled
+$ sudo vi default
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+
+    server_name birds.example.com;
+    return      301 https://$server_name$request_uri;
+}
+
+server {
+
+    listen 443 ssl;
+
+    server_name birds.example.com
+    add_header Strict-Transport-Security "max-age=31536000";
+
+    ssl_certificate     /home/pi/.getssl/birds.example.com/birds.example.com_chain.crt;
+    ssl_certificate_key /home/pi/.getssl/birds.example.com/birds.example.com.key;
+    ssl_protocols       TLSv1 TLSv1.1 TLSv1.2;
+    ssl_ciphers     HIGH:!aNULL:!MD5;
+
+
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+    }
+
+}
+
+$ sudo systemctl enable nginx
+$ sudo systemctl start nginx
+```
+
+Now to make sure that the script is started at the appropriate time (after nginx
+on boot), we will add a service to systemd
+```
+$ sudo vi /etc/systemd/system/hummingbirds.service
+[Unit]
+Description=Hummingbird webcam program
+After=nginx.service
+
+[Service]
+Type=simple
+ExecStart=/home/pi/Projects/hummingbirds/hummingbirds.py --require-login --resolution=medium
+
+[Install]
+WantedBy=multi-user.target
+
+$ sudo systemctl daemon-reload
+$ sudo systemctl enable hummingbirds
+$ sudo systemctl start hummingbirds
+```
+
+One more bit of housekeeping, we should run cron so that we can update the
+certifiate when it expires (and remember to reload the webserver). Since we
+created the configuration as the user pi we should use /etc/crontab and run as
+that user during the update.
+```
+$ vi /etc/crontab
 ...
-ACL=('/home/pi/Projects/hummingbirds2/.well-known/acme-challenge')
-...
+35 3    * * *   pi      /home/pi/getssl/getssl -u -a -q
+36 3    * * *   root    systemctl reload nginx
 ```
-Make sure that your application is publicly routable on ports 80 and 443. Then
-run the script
-```
-$ cd getssl
-$ ./getssl <your domain name here>
-```
-The script should write a response into
-.well-known/acme-challenge/SOMEWEIRDFILE, it'll go and grab the signed
-certificate and intermediate certs and write them into ~/.getssl/<your domain
-name here>.
+
+At this point, visiting http://birds.example.com should redirect you to
+https://birds.example.com and then on to the login page. You should enter the
+password you defined above then enjoy the view!
+
 
